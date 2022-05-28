@@ -1,6 +1,8 @@
 package com.kdt.prmgs.springsec.config;
 
 
+import com.auth0.jwt.JWTCreator;
+import com.kdt.prmgs.springsec.jwt.Jwt;
 import com.kdt.prmgs.springsec.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -10,14 +12,20 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.jdbc.JdbcDaoImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
 @Configuration
@@ -25,6 +33,14 @@ import javax.sql.DataSource;
 public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
 
     private UserService userService;
+
+    private JwtConfigure jwtConfigure;
+
+    @Autowired
+    public void setJwtConfigure(JwtConfigure jwtConfigure) {
+
+        this.jwtConfigure = jwtConfigure;
+    }
 
     @Autowired
     public void setUserService(UserService userService) {
@@ -38,6 +54,15 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
         return new BCryptPasswordEncoder();
     }
 
+    @Bean
+    public Jwt jwt() {
+        return new Jwt(
+                jwtConfigure.getIssuer(),
+                jwtConfigure.getClientSecret(),
+                jwtConfigure.getExpirySeconds()
+        );
+    }
+
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
 
@@ -47,7 +72,20 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
     @Override
     public void configure(WebSecurity web) throws Exception {
 
-        web.ignoring().antMatchers("/assets/**", "/h2-console/**");
+        web.ignoring().antMatchers("/h2-console/**");
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, e) -> {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Object principal = authentication != null ? authentication.getPrincipal() : null;
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("text/plain;charset=UTF-8");
+            response.getWriter().write("ACCESS DENIED");
+            response.getWriter().flush();
+            response.getWriter().close();
+        };
     }
 
     @Override
@@ -55,24 +93,23 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
 
         http
             .authorizeRequests()
-                .antMatchers("/me").hasAnyRole("USER", "ADMIN")
+                .antMatchers("/api/user/me").hasAnyRole("USER", "ADMIN")
                 .anyRequest().permitAll()
                 .and()
+            .csrf()
+                .disable()
+            .headers()
+                .disable()
             .formLogin()
-                .defaultSuccessUrl("/")
-                .permitAll()
-                .and()
+                .disable()
             .logout()
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout"))
-                .logoutSuccessUrl("/")
-                .invalidateHttpSession(true)
-                .clearAuthentication(true)
-                .and()
+                .disable()
             .rememberMe()
-                .rememberMeParameter("remember-me")
-                .tokenValiditySeconds(300)
+                .disable()
+                .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
-            .requiresChannel()
-                .anyRequest().requiresSecure();
+            .exceptionHandling()
+                .accessDeniedHandler(accessDeniedHandler());
     }
 }

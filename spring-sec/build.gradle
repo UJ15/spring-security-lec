@@ -22,12 +22,6 @@ dependencies {
     // https://mvnrepository.com/artifact/org.springframework.security/spring-security-test
     testImplementation 'org.springframework.security:spring-security-test:5.6.3'
 
-    // https://mvnrepository.com/artifact/org.thymeleaf.extras/thymeleaf-extras-springsecurity5
-    implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity5'
-
-    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-thymeleaf
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf:2.6.7'
-
     // https://mvnrepository.com/artifact/com.h2database/h2
     implementation 'com.h2database:h2:2.1.212'
 
@@ -43,7 +37,8 @@ dependencies {
     // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-data-jpa
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa:2.7.0'
 
-
+    // https://mvnrepository.com/artifact/com.auth0/java-jwt
+    implementation 'com.auth0:java-jwt:3.19.2'
 }
 
 tasks.named('test') {
