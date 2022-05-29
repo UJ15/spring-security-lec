@@ -1,53 +1,38 @@
 package com.kdt.prmgs.springsec.config;
 
-
-import com.auth0.jwt.JWTCreator;
 import com.kdt.prmgs.springsec.jwt.Jwt;
+import com.kdt.prmgs.springsec.jwt.JwtAuthenticationFilter;
+import com.kdt.prmgs.springsec.jwt.JwtAuthenticationProvider;
 import com.kdt.prmgs.springsec.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.jdbc.JdbcDaoImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.access.AccessDeniedHandler;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.context.SecurityContextPersistenceFilter;
 
 import javax.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
 
 @Configuration
 @EnableWebSecurity
 public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
 
-    private UserService userService;
-
     private JwtConfigure jwtConfigure;
 
     @Autowired
     public void setJwtConfigure(JwtConfigure jwtConfigure) {
-
         this.jwtConfigure = jwtConfigure;
     }
-
-    @Autowired
-    public void setUserService(UserService userService) {
-
-        this.userService = userService;
-    }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
 
@@ -61,12 +46,6 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
                 jwtConfigure.getClientSecret(),
                 jwtConfigure.getExpirySeconds()
         );
-    }
-
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-
-        auth.userDetailsService(userService);
     }
 
     @Override
@@ -86,6 +65,31 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
             response.getWriter().flush();
             response.getWriter().close();
         };
+    }
+
+    @Bean
+    public JwtAuthenticationProvider jwtAuthenticationProvider(Jwt jwt, UserService userService) {
+
+        return new JwtAuthenticationProvider(jwt, userService);
+    }
+
+    @Autowired
+    public void configAuthentication(AuthenticationManagerBuilder builder, JwtAuthenticationProvider provider) {
+
+        builder.authenticationProvider(provider);
+    }
+
+    @Bean
+    @Override
+    public AuthenticationManager authenticationManagerBean() throws Exception {
+
+        return super.authenticationManagerBean();
+    }
+
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+
+        Jwt jwt = getApplicationContext().getBean(Jwt.class);
+        return new JwtAuthenticationFilter(jwtConfigure.getHeader(), jwt);
     }
 
     @Override
@@ -110,6 +114,8 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
             .exceptionHandling()
-                .accessDeniedHandler(accessDeniedHandler());
+                .accessDeniedHandler(accessDeniedHandler())
+                .and()
+            .addFilterAfter(jwtAuthenticationFilter(), SecurityContextPersistenceFilter.class);
     }
 }
