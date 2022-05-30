@@ -27,31 +27,16 @@ import javax.servlet.http.HttpServletResponse;
 @EnableWebSecurity
 public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
 
-    private JwtConfigure jwtConfigure;
 
-    @Autowired
-    public void setJwtConfigure(JwtConfigure jwtConfigure) {
+    private final JwtConfigure jwtConfigure;
+
+    public WebSecurityConfigure(JwtConfigure jwtConfigure) {
         this.jwtConfigure = jwtConfigure;
-    }
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public Jwt jwt() {
-        return new Jwt(
-                jwtConfigure.getIssuer(),
-                jwtConfigure.getClientSecret(),
-                jwtConfigure.getExpirySeconds()
-        );
     }
 
     @Override
-    public void configure(WebSecurity web) throws Exception {
-
-        web.ignoring().antMatchers("/h2-console/**");
+    public void configure(WebSecurity web) {
+        web.ignoring().antMatchers("/assets/**", "/h2-console/**");
     }
 
     @Bean
@@ -68,26 +53,36 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
     }
 
     @Bean
-    public JwtAuthenticationProvider jwtAuthenticationProvider(Jwt jwt, UserService userService) {
-
-        return new JwtAuthenticationProvider(jwt, userService);
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
-    @Autowired
-    public void configAuthentication(AuthenticationManagerBuilder builder, JwtAuthenticationProvider provider) {
+    @Bean
+    public Jwt jwt() {
+        return new Jwt(
+                jwtConfigure.getIssuer(),
+                jwtConfigure.getClientSecret(),
+                jwtConfigure.getExpirySeconds()
+        );
+    }
 
-        builder.authenticationProvider(provider);
+    @Bean
+    public JwtAuthenticationProvider jwtAuthenticationProvider(UserService userService, Jwt jwt) {
+        return new JwtAuthenticationProvider(jwt, userService);
     }
 
     @Bean
     @Override
     public AuthenticationManager authenticationManagerBean() throws Exception {
-
         return super.authenticationManagerBean();
     }
 
-    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+    @Autowired
+    public void configureAuthentication(AuthenticationManagerBuilder builder, JwtAuthenticationProvider authenticationProvider) {
+        builder.authenticationProvider(authenticationProvider);
+    }
 
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
         Jwt jwt = getApplicationContext().getBean(Jwt.class);
         return new JwtAuthenticationFilter(jwtConfigure.getHeader(), jwt);
     }
@@ -104,13 +99,15 @@ public class WebSecurityConfigure extends WebSecurityConfigurerAdapter {
                 .disable()
             .headers()
                 .disable()
+            .httpBasic()
+                .disable()
             .formLogin()
                 .disable()
             .logout()
                 .disable()
             .rememberMe()
                 .disable()
-                .sessionManagement()
+            .sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
             .exceptionHandling()
